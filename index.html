@@ -205,7 +205,7 @@
         border-radius: 3px;
         margin: 10px 0;
         overflow: hidden;
-  }
+      }
       .progress {
         height: 100%;
         background-color: var(--primary);
@@ -344,21 +344,29 @@
 
     <footer>
       <div class="container">
-        <p>Dashboard Nervolaris &copy; 2025 - Gerenciamento de <a href="https://www.siterastreio.com.br/" target="_blank">Rastreamento</a></p>
+        <p>
+          Dashboard Nervolaris &copy; 2025 - Gerenciamento de
+          <a href="https://www.siterastreio.com.br/" target="_blank"
+            >Rastreamento</a
+          >
+        </p>
       </div>
     </footer>
 
     <script>
       // ====== CONFIG ======
-      const SHEET_URL = "https://script.google.com/macros/s/AKfycbx-v2n9NnCOY0ap6xHenzShrxTLXwjUkNWBtr90IOiVOcKx8BBNPVqXTY-awUdrj4ZZHw/exec";
-      const TRACK_PROXY_URL = "https://script.google.com/macros/s/AKfycbx-v2n9NnCOY0ap6xHenzShrxTLXwjUkNWBtr90IOiVOcKx8BBNPVqXTY-awUdrj4ZZHw/exec";
+      const SHEET_URL =
+        "https://script.google.com/macros/s/AKfycbxdCInscFFuq_qHAKlZXnwAXi4JgKitZQ6KZlb7oGHysyjVlz280UOKlVN1t8Gyax4__A/exec";
+      const TRACK_PROXY_URL =
+        "https://script.google.com/macros/s/AKfycbxdCInscFFuq_qHAKlZXnwAXi4JgKitZQ6KZlb7oGHysyjVlz280UOKlVN1t8Gyax4__A/exec";
 
       let clientData = [];
 
       async function loadClientData() {
         try {
-          document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
-          
+          document.getElementById("clientGrid").innerHTML =
+            '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
+
           const res = await fetch(SHEET_URL);
           const data = await res.json();
 
@@ -368,7 +376,7 @@
           }
 
           // Mapear os dados para o formato esperado
-          clientData = data.map(row => ({
+          clientData = data.map((row) => ({
             name: row.name || "Não informado",
             date: row.date,
             contact: row.contact || "",
@@ -376,34 +384,39 @@
             time: row.time || "",
             status: row.status || "Agendado",
             trackingCode: row.trackingCode || "",
-            delivered: row.delivered === true || 
-                      row.delivered === "TRUE" || 
-                      row.delivered === "Verdadeiro" ||
-                      (typeof row.delivered === "string" && row.delivered.toLowerCase() === "true")
+            delivered:
+              row.delivered === true ||
+              row.delivered === "TRUE" ||
+              row.delivered === "Verdadeiro" ||
+              (typeof row.delivered === "string" &&
+                row.delivered.toLowerCase() === "true"),
           }));
 
           if (clientData.length === 0) {
-            document.getElementById('clientGrid').innerHTML = '<div class="loading">Nenhum dado encontrado na planilha.</div>';
+            document.getElementById("clientGrid").innerHTML =
+              '<div class="loading">Nenhum dado encontrado na planilha.</div>';
             return;
           }
 
           renderClientCards(clientData);
         } catch (error) {
           console.error("Erro ao carregar dados:", error);
-          document.getElementById('clientGrid').innerHTML = `<div class="loading">Erro ao carregar dados: ${error.message}</div>`;
+          document.getElementById(
+            "clientGrid"
+          ).innerHTML = `<div class="loading">Erro ao carregar dados: ${error.message}</div>`;
         }
       }
 
       function formatCurrency(value) {
         return value.toFixed(2).replace(".", ",");
       }
-      
+
       function formatDate(dateString) {
         if (!dateString) return "-";
         try {
           const date = new Date(dateString);
           if (isNaN(date.getTime())) return dateString;
-          
+
           const options = { day: "2-digit", month: "2-digit", year: "numeric" };
           return date.toLocaleDateString("pt-BR", options);
         } catch (e) {
@@ -413,74 +426,97 @@
 
       async function fetchTrackingInfo(trackingCode) {
         if (!trackingCode || trackingCode.trim() === "") {
-          return { 
-            status: "Sem código de rastreio", 
-            deliveryDate: "-", 
+          return {
+            status: "Sem código de rastreio",
+            deliveryDate: "-",
             events: [],
-            isDelivered: false
+            isDelivered: false,
           };
         }
-        
+
         try {
           // Usar o Google Apps Script como proxy para evitar CORS
           const response = await fetch(TRACK_PROXY_URL, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify({ code: trackingCode })
+            body: JSON.stringify({ code: trackingCode }),
           });
-          
+
           if (!response.ok) {
             throw new Error(`Erro na API: ${response.status}`);
           }
-          
+
           const data = await response.json();
-          
+
           // Verificar se a API retornou um erro
           if (data.error) {
             throw new Error(data.error);
           }
-          
+
           // Processar a resposta da Wonca API (baseado no exemplo que você forneceu)
           if (data && data.json) {
-            const trackingData = JSON.parse(data.json);
-            
-            // Extrair informações relevantes
-            const events = trackingData.eventos || [];
-            const isDelivered = events.some(event => 
-              event.descricao && event.descricao.toLowerCase().includes("entregue")
-            );
-            
-            // Encontrar o último evento para mostrar o status atual
-            const lastEvent = events.length > 0 ? events[0] : null;
-            
-            return {
-              status: lastEvent ? lastEvent.descricao : "Status desconhecido",
-              deliveryDate: trackingData.dtPrevista || "Sem previsão",
-              events: events.map(event => ({
-                date: event.dtHrCriado ? event.dtHrCriado.date : "",
-                location: event.unidade ? event.unidade.endereco.cidade + " - " + event.unidade.endereco.uf : "",
-                description: event.descricao || "",
-                details: event.detalhe || ""
-              })),
-              isDelivered: isDelivered
-            };
+            try {
+              const trackingData = JSON.parse(data.json);
+
+              // Extrair informações relevantes
+              const events = trackingData.eventos || [];
+              const isDelivered = events.some(
+                (event) =>
+                  event.descricao &&
+                  event.descricao.toLowerCase().includes("entregue")
+              );
+
+              // Encontrar o último evento para mostrar o status atual
+              const lastEvent = events.length > 0 ? events[0] : null;
+
+              return {
+                status: lastEvent ? lastEvent.descricao : "Status desconhecido",
+                deliveryDate: trackingData.dtPrevista || "Sem previsão",
+                events: events.map((event) => ({
+                  date: event.dtHrCriado ? event.dtHrCriado.date : "",
+                  location: event.unidade
+                    ? event.unidade.endereco
+                      ? event.unidade.endereco.cidade +
+                        " - " +
+                        event.unidade.endereco.uf
+                      : ""
+                    : "",
+                  description: event.descricao || "",
+                  details: event.detalhe || "",
+                })),
+                isDelivered: isDelivered,
+              };
+            } catch (parseError) {
+              console.error("Erro ao parsear JSON:", parseError);
+              return {
+                status: "Resposta inválida da API",
+                deliveryDate: "-",
+                events: [],
+                isDelivered: false,
+              };
+            }
           } else {
-            return { 
-              status: "Código não encontrado", 
-              deliveryDate: "-", 
+            return {
+              status: "Código não encontrado",
+              deliveryDate: "-",
               events: [],
-              isDelivered: false
+              isDelivered: false,
             };
           }
         } catch (error) {
-          console.error("Erro ao buscar rastreio:", error, "Código:", trackingCode);
-          return { 
-            status: "Erro na consulta", 
-            deliveryDate: "-", 
+          console.error(
+            "Erro ao buscar rastreio:",
+            error,
+            "Código:",
+            trackingCode
+          );
+          return {
+            status: "Erro na consulta",
+            deliveryDate: "-",
             events: [],
-            isDelivered: false
+            isDelivered: false,
           };
         }
       }
@@ -491,12 +527,14 @@
         updateStats(clients);
 
         if (clients.length === 0) {
-          grid.innerHTML = '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
+          grid.innerHTML =
+            '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
           return;
         }
 
         // Mostrar mensagem de carregamento
-        grid.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando informações de rastreamento...</div>';
+        grid.innerHTML =
+          '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando informações de rastreamento...</div>';
 
         for (let i = 0; i < clients.length; i++) {
           const client = clients[i];
@@ -504,15 +542,17 @@
 
           let statusClass = "status-agendado";
           let statusText = client.status;
-          
+
           // Priorizar informações dos correios sobre o status
           if (trackingInfo.isDelivered) {
             statusClass = "status-entregue";
             statusText = "Entregue";
-          } else if (trackingInfo.status.toLowerCase().includes("trânsito") || 
-                     trackingInfo.status.toLowerCase().includes("rota") ||
-                     trackingInfo.status.toLowerCase().includes("entrega") ||
-                     trackingInfo.status.toLowerCase().includes("expedido")) {
+          } else if (
+            trackingInfo.status.toLowerCase().includes("trânsito") ||
+            trackingInfo.status.toLowerCase().includes("rota") ||
+            trackingInfo.status.toLowerCase().includes("entrega") ||
+            trackingInfo.status.toLowerCase().includes("expedido")
+          ) {
             statusClass = "status-transito";
             statusText = trackingInfo.status;
           } else if (client.delivered) {
@@ -537,41 +577,82 @@
             <span class="status-badge ${statusClass}">${statusText}</span>
           </div>
           <div class="card-body">
-            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(client.date)}</span></div>
-            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(client.value)}</span></div>
-            ${client.time ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>` : ''}
-            ${client.trackingCode ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>` : ''}
+            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(
+              client.date
+            )}</span></div>
+            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(
+              client.value
+            )}</span></div>
+            ${
+              client.time
+                ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>`
+                : ""
+            }
+            ${
+              client.trackingCode
+                ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>`
+                : ""
+            }
             <div class="tracking-info">
               <h4><i class="fas fa-truck"></i> Rastreamento</h4>
               <p><strong>Status:</strong> ${trackingInfo.status}</p>
-              <p><strong>Previsão de entrega:</strong> ${trackingInfo.deliveryDate}</p>
-              ${trackingInfo.events.length > 0 ? `
+              <p><strong>Previsão de entrega:</strong> ${
+                trackingInfo.deliveryDate
+              }</p>
+              ${
+                trackingInfo.events.length > 0
+                  ? `
               <div style="margin-top: 10px;">
                 <h4><i class="fas fa-history"></i> Últimas atualizações</h4>
-                ${trackingInfo.events.slice(0, 3).map(
-                  (ev) => `
+                ${trackingInfo.events
+                  .slice(0, 3)
+                  .map(
+                    (ev) => `
                   <div class="event-item">
-                    <div class="event-date">${ev.date ? new Date(ev.date).toLocaleString('pt-BR') : 'Data não disponível'}</div>
-                    <div class="event-location">${ev.location || 'Local não disponível'}</div>
-                    <div class="event-status">${ev.description || 'Sem descrição'}</div>
-                    ${ev.details ? `<div><small>${ev.details}</small></div>` : ''}
+                    <div class="event-date">${
+                      ev.date
+                        ? new Date(ev.date).toLocaleString("pt-BR")
+                        : "Data não disponível"
+                    }</div>
+                    <div class="event-location">${
+                      ev.location || "Local não disponível"
+                    }</div>
+                    <div class="event-status">${
+                      ev.description || "Sem descrição"
+                    }</div>
+                    ${
+                      ev.details
+                        ? `<div><small>${ev.details}</small></div>`
+                        : ""
+                    }
                   </div>
                   `
-                ).join("")}
+                  )
+                  .join("")}
               </div>
-              ` : ''}
+              `
+                  : ""
+              }
             </div>
             <div style="margin-top:15px;display:flex;justify-content:space-between;">
-              ${phoneNumber ? `
+              ${
+                phoneNumber
+                  ? `
               <a href="https://wa.me/${phoneNumber}" target="_blank" class="btn" style="background:#25D366;">
                 <i class="fab fa-whatsapp"></i> Contatar
               </a>
-              ` : ''}
-              ${!client.delivered && !trackingInfo.isDelivered ? `
+              `
+                  : ""
+              }
+              ${
+                !client.delivered && !trackingInfo.isDelivered
+                  ? `
               <button class="btn" onclick="markAsDelivered(${i})">
                 <i class="fas fa-check"></i> Entregue
               </button>
-              ` : ''}
+              `
+                  : ""
+              }
             </div>
           </div>`;
           grid.appendChild(card);
@@ -582,52 +663,68 @@
         const totalRevenue = clients.reduce((sum, c) => sum + c.value, 0);
         const totalCommission = totalRevenue * 0.55;
         const deliveredCount = clients.filter((c) => c.delivered).length;
-        const transitCount = clients.filter((c) => !c.delivered && c.trackingCode).length;
-        
-        document.getElementById("totalRevenue").textContent = formatCurrency(totalRevenue);
-        document.getElementById("totalCommission").textContent = formatCurrency(totalCommission);
+        const transitCount = clients.filter(
+          (c) => !c.delivered && c.trackingCode
+        ).length;
+
+        document.getElementById("totalRevenue").textContent =
+          formatCurrency(totalRevenue);
+        document.getElementById("totalCommission").textContent =
+          formatCurrency(totalCommission);
         document.getElementById("deliveredCount").textContent = deliveredCount;
         document.getElementById("totalCount").textContent = clients.length;
         document.getElementById("transitCount").textContent = transitCount;
       }
 
       function markAsDelivered(index) {
-        if (confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)) {
+        if (
+          confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)
+        ) {
           clientData[index].delivered = true;
           renderClientCards(clientData);
           // Aqui você precisaria adicionar código para atualizar a planilha
-          alert(`Pedido de ${clientData[index].name} marcado como entregue localmente!`);
+          alert(
+            `Pedido de ${clientData[index].name} marcado como entregue localmente!`
+          );
         }
       }
 
       function filterCards() {
-        const nameFilter = document.getElementById("searchName").value.toLowerCase();
+        const nameFilter = document
+          .getElementById("searchName")
+          .value.toLowerCase();
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
         const statusFilter = document.getElementById("statusFilter").value;
 
         const filtered = clientData.filter((c) => {
-          if (nameFilter && !c.name.toLowerCase().includes(nameFilter)) return false;
-          
+          if (nameFilter && !c.name.toLowerCase().includes(nameFilter))
+            return false;
+
           if (startDate && c.date) {
-            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            const clientDate = new Date(c.date).toISOString().split("T")[0];
             if (clientDate < startDate) return false;
           }
-          
+
           if (endDate && c.date) {
-            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            const clientDate = new Date(c.date).toISOString().split("T")[0];
             if (clientDate > endDate) return false;
           }
-          
+
           if (statusFilter !== "all") {
             if (statusFilter === "Entregue" && !c.delivered) return false;
-            if (statusFilter === "Em trânsito" && (c.delivered || !c.trackingCode)) return false;
-            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode)) return false;
+            if (
+              statusFilter === "Em trânsito" &&
+              (c.delivered || !c.trackingCode)
+            )
+              return false;
+            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode))
+              return false;
           }
-          
+
           return true;
         });
-        
+
         renderClientCards(filtered);
       }
 
@@ -637,16 +734,24 @@
         const today = new Date();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
-        
-        document.getElementById("startDate").value = thirtyDaysAgo.toISOString().split("T")[0];
-        document.getElementById("endDate").value = today.toISOString().split("T")[0];
-        
+
+        document.getElementById("startDate").value = thirtyDaysAgo
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("endDate").value = today
+          .toISOString()
+          .split("T")[0];
+
         // Carregar dados iniciais
         loadClientData();
-        
+
         // Configurar event listeners
-        document.getElementById("filterBtn").addEventListener("click", filterCards);
-        document.getElementById("refreshBtn").addEventListener("click", loadClientData);
+        document
+          .getElementById("filterBtn")
+          .addEventListener("click", filterCards);
+        document
+          .getElementById("refreshBtn")
+          .addEventListener("click", loadClientData);
         document.getElementById("searchName").addEventListener("keyup", (e) => {
           if (e.key === "Enter") filterCards();
         });
