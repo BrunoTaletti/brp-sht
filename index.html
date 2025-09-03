@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard de Encomendas</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 20px; }
+    h1 { text-align: center; }
+    .filtros { text-align: center; margin-bottom: 20px; }
+    .filtros input { padding: 8px; margin: 5px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .card:hover { transform: scale(1.02); }
+    .entregue { background: #d4edda; border-left: 6px solid #28a745; }
+    .status { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>📦 Dashboard de Encomendas</h1>
+
+  <div class="filtros">
+    <input type="text" id="filtroNome" placeholder="Filtrar por nome...">
+    <input type="date" id="filtroData">
+    <button onclick="carregarDados()">Filtrar</button>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <script>
+    // 👉 Substitua pela URL do Apps Script publicado
+    const SHEET_URL = "https://script.google.com/macros/s/AKfycbx5FutX-QDkz_DY9odwd-hNDWSMIgh8TtZMlpr2XysQk8j9RPoZ65y-peigrnm0SMiyjw/exec";
+    const API_CORREIOS = "https://api.linketrack.com/track/json?user=guest&token=guest&codigo=";
+
+    function carregarDados() {
+      const nomeFiltro = document.getElementById("filtroNome").value.toLowerCase();
+      const dataFiltro = document.getElementById("filtroData").value;
+
+      const script = document.createElement("script");
+      script.src = SHEET_URL + "?callback=processarDados";
+      document.body.appendChild(script);
+
+      window.filtros = { nomeFiltro, dataFiltro };
+    }
+
+    async function processarDados(dados) {
+      const { nomeFiltro, dataFiltro } = window.filtros || {};
+      const container = document.getElementById("cards");
+      container.innerHTML = "";
+
+      for (const cliente of dados) {
+        if (nomeFiltro && !String(cliente["NOME DO CLIENTE"]).toLowerCase().includes(nomeFiltro)) continue;
+        if (dataFiltro && String(cliente["DATA"]) !== dataFiltro) continue;
+
+        const entregue = cliente["ENTREGUE"] === true || cliente["ENTREGUE"] === "TRUE";
+
+        // 🔎 Busca status dos Correios
+        let statusCorreios = "Sem rastreio";
+        let previsao = "N/A";
+        if (cliente["RASTREIO"]) {
+          try {
+            const resp = await fetch(API_CORREIOS + cliente["RASTREIO"]);
+            const rastreio = await resp.json();
+            statusCorreios = rastreio?.eventos?.[0]?.status || "Aguardando atualização...";
+            previsao = rastreio?.eventos?.[0]?.data || "Sem previsão";
+          } catch (e) {
+            statusCorreios = "Erro ao consultar";
+          }
+        }
+
+        // Monta card
+        const card = document.createElement("div");
+        card.className = "card" + (entregue ? " entregue" : "");
+        card.innerHTML = `
+          <h3>${cliente["NOME DO CLIENTE"]}</h3>
+          <p><b>Data:</b> ${cliente["DATA"]}</p>
+          <p><b>Contato:</b> ${cliente["CONTATO"]}</p>
+          <p><b>Valor:</b> R$ ${cliente["VALOR"]}</p>
+          <p><b>Rastreio:</b> ${cliente["RASTREIO"] || "N/A"}</p>
+          <p><b>Status Correios:</b> ${statusCorreios}</p>
+          <p><b>Previsão de Entrega:</b> ${previsao}</p>
+          <p><b>Status Final:</b> ${entregue ? "✅ Entregue" : "🚚 Em trânsito"}</p>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    carregarDados();
+  </script>
+</body>
+</html>
