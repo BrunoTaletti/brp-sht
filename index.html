@@ -335,49 +335,51 @@
 
     <script>
       // ====== CONFIG ======
-      const SHEET_URL =
-        "https://script.google.com/macros/s/AKfycbx9lLMgaRsSDgBG_-65amUOeUmBm82tRRkODRc8E5733JgT_qDu0-57hZ4hIufT9l_wWA/exec";
-      
-      // API alternativa para rastreamento (mais confiável)
-      const TRACK_API = (code) => `https://api.linketrack.com/track/json?user=teste&token=1abcd00b2731640e886fb41a8a9671ad1434c599dbaa0a0de9a5aa619f29a83f&codigo=${code}`;
+      const SHEET_URL = "https://script.google.com/macros/s/AKfycbxQhJF9Tr9nkJqQfRfZk7vkDOXkfeq_MNL6HtcgO1EflMI2hzA_4As0ERsyPohyrqijgw/exec";
+    
+    // API alternativa para rastreamento
+    const TRACK_API = (code) => `https://api.linketrack.com/track/json?user=teste&token=1abcd00b2731640e886fb41a8a9671ad1434c599dbaa0a0de9a5aa619f29a83f&codigo=${code}`;
 
-      let clientData = [];
+    let clientData = [];
 
-      async function loadClientData() {
-        try {
-          document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
-          
-          const res = await fetch(SHEET_URL);
-          const data = await res.json();
+    async function loadClientData() {
+      try {
+        document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
+        
+        const res = await fetch(SHEET_URL);
+        const data = await res.json();
 
-          // Filtrar apenas linhas com nome de cliente
-          clientData = data
-            .filter(row => row["NOME DO CLIENTE"] && row["NOME DO CLIENTE"].trim() !== "")
-            .map((row) => ({
-              name: row["NOME DO CLIENTE"] || "Não informado",
-              date: row["DATA"],
-              contact: row["CONTATO"] || "",
-              value: parseFloat(row["VALOR"] || 0),
-              time: row["TEMPO"] || "",
-              status: row["STATUS"] || "Agendado",
-              trackingCode: row["RASTREIO"] || "",
-              delivered: row["ENTREGUE"] === true || 
-                         row["ENTREGUE"] === "TRUE" || 
-                         row["ENTREGUE"] === "Verdadeiro" ||
-                         (typeof row["ENTREGUE"] === "string" && row["ENTREGUE"].toLowerCase() === "true")
-            }));
-
-          if (clientData.length === 0) {
-            document.getElementById('clientGrid').innerHTML = '<div class="loading">Nenhum dado encontrado na planilha.</div>';
-            return;
-          }
-
-          renderClientCards(clientData);
-        } catch (error) {
-          console.error("Erro ao carregar dados:", error);
-          document.getElementById('clientGrid').innerHTML = '<div class="loading">Erro ao carregar dados. Verifique o console para detalhes.</div>';
+        // Verificar se há erro
+        if (data.error) {
+          throw new Error(data.error);
         }
+
+        // Mapear os dados para o formato esperado
+        clientData = data.map(row => ({
+          name: row.name || "Não informado",
+          date: row.date,
+          contact: row.contact || "",
+          value: parseFloat(row.value || 0),
+          time: row.time || "",
+          status: row.status || "Agendado",
+          trackingCode: row.trackingCode || "",
+          delivered: row.delivered === true || 
+                     row.delivered === "TRUE" || 
+                     row.delivered === "Verdadeiro" ||
+                     (typeof row.delivered === "string" && row.delivered.toLowerCase() === "true")
+        }));
+
+        if (clientData.length === 0) {
+          document.getElementById('clientGrid').innerHTML = '<div class="loading">Nenhum dado encontrado na planilha.</div>';
+          return;
+        }
+
+        renderClientCards(clientData);
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+        document.getElementById('clientGrid').innerHTML = `<div class="loading">Erro ao carregar dados: ${error.message}</div>`;
       }
+    }
 
       function formatCurrency(value) {
         return value.toFixed(2).replace(".", ",");
