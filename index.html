@@ -239,6 +239,12 @@
           grid-template-columns: 1fr;
         }
       }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        font-size: 18px;
+        color: var(--gray);
+      }
     </style>
   </head>
   <body>
@@ -314,7 +320,11 @@
         </div>
       </div>
 
-      <div class="client-grid" id="clientGrid"></div>
+      <div class="client-grid" id="clientGrid">
+        <div class="loading">
+          <i class="fas fa-spinner fa-spin"></i> Carregando dados...
+        </div>
+      </div>
     </div>
 
     <footer>
@@ -327,59 +337,93 @@
       // ====== CONFIG ======
       const SHEET_URL =
         "https://script.google.com/macros/s/AKfycbxQhJF9Tr9nkJqQfRfZk7vkDOXkfeq_MNL6HtcgO1EflMI2hzA_4As0ERsyPohyrqijgw/exec";
-      const TRACK_API = (code) => `https://api.rastreio.app/v1/track/${code}`;
+      
+      // API alternativa para rastreamento (mais confiável)
+      const TRACK_API = (code) => `https://api.linketrack.com/track/json?user=teste&token=1abcd00b2731640e886fb41a8a9671ad1434c599dbaa0a0de9a5aa619f29a83f&codigo=${code}`;
 
       let clientData = [];
 
       async function loadClientData() {
-        const res = await fetch(SHEET_URL);
-        const data = await res.json();
+        try {
+          document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
+          
+          const res = await fetch(SHEET_URL);
+          const data = await res.json();
 
-        // Mapear colunas da planilha para os campos usados no front
-        clientData = data.map((row) => ({
-          name: row["NOME DO CLIENTE"],
-          date: row["DATA"],
-          contact: row["CONTATO"],
-          value: parseFloat(row["VALOR"]) || 0,
-          time: row["TEMPO"],
-          status: row["STATUS"],
-          trackingCode: row["RASTREIO"],
-          delivered: row["ENTREGUE"] === true || row["ENTREGUE"] === "TRUE",
-        }));
+          // Filtrar apenas linhas com nome de cliente
+          clientData = data
+            .filter(row => row["NOME DO CLIENTE"] && row["NOME DO CLIENTE"].trim() !== "")
+            .map((row) => ({
+              name: row["NOME DO CLIENTE"] || "Não informado",
+              date: row["DATA"],
+              contact: row["CONTATO"] || "",
+              value: parseFloat(row["VALOR"] || 0),
+              time: row["TEMPO"] || "",
+              status: row["STATUS"] || "Agendado",
+              trackingCode: row["RASTREIO"] || "",
+              delivered: row["ENTREGUE"] === true || 
+                         row["ENTREGUE"] === "TRUE" || 
+                         row["ENTREGUE"] === "Verdadeiro" ||
+                         (typeof row["ENTREGUE"] === "string" && row["ENTREGUE"].toLowerCase() === "true")
+            }));
 
-        renderClientCards(clientData);
+          if (clientData.length === 0) {
+            document.getElementById('clientGrid').innerHTML = '<div class="loading">Nenhum dado encontrado na planilha.</div>';
+            return;
+          }
+
+          renderClientCards(clientData);
+        } catch (error) {
+          console.error("Erro ao carregar dados:", error);
+          document.getElementById('clientGrid').innerHTML = '<div class="loading">Erro ao carregar dados. Verifique o console para detalhes.</div>';
+        }
       }
 
       function formatCurrency(value) {
         return value.toFixed(2).replace(".", ",");
       }
+      
       function formatDate(dateString) {
         if (!dateString) return "-";
-        const options = { day: "2-digit", month: "2-digit", year: "numeric" };
-        return new Date(dateString).toLocaleDateString("pt-BR", options);
+        try {
+          // Tenta converter para data - o formato pode variar
+          const date = new Date(dateString);
+          if (isNaN(date.getTime())) return dateString; // Se não for uma data válida, retorna o original
+          
+          const options = { day: "2-digit", month: "2-digit", year: "numeric" };
+          return date.toLocaleDateString("pt-BR", options);
+        } catch (e) {
+          return dateString; // Em caso de erro, retorna o valor original
+        }
       }
 
       async function fetchTrackingInfo(trackingCode) {
-        if (!trackingCode)
-          return { status: "Sem código", deliveryDate: "-", events: [] };
+        if (!trackingCode || trackingCode.trim() === "")
+          return { status: "Sem código de rastreio", deliveryDate: "-", events: [] };
+        
         try {
           const res = await fetch(TRACK_API(trackingCode));
+          if (!res.ok) throw new Error("Erro na API de rastreio");
+          
           const data = await res.json();
-          if (data.success) {
-            const ultimoEvento = data.events[0];
+          
+          if (data && data.eventos && data.eventos.length > 0) {
+            const ultimoEvento = data.eventos[0];
             return {
-              status: ultimoEvento.status,
-              deliveryDate: ultimoEvento.data || "Sem previsão",
-              events: data.events.map((ev) => ({
-                date: ev.data,
-                location: ev.local,
-                description: ev.status,
+              status: ultimoEvento.status || "Status desconhecido",
+              deliveryDate: data.prazo || ultimoEvento.data || "Sem previsão",
+              events: data.eventos.map((ev) => ({
+                date: ev.data || "",
+                location: ev.local || "",
+                description: ev.status || ""
               })),
             };
-          } else
-            return { status: "Não encontrado", deliveryDate: "-", events: [] };
+          } else {
+            return { status: "Código não encontrado", deliveryDate: "-", events: [] };
+          }
         } catch (e) {
-          return { status: "Erro API", deliveryDate: "-", events: [] };
+          console.error("Erro ao buscar rastreio:", e);
+          return { status: "Erro na consulta", deliveryDate: "-", events: [] };
         }
       }
 
@@ -388,59 +432,71 @@
         grid.innerHTML = "";
         updateStats(clients);
 
+        if (clients.length === 0) {
+          grid.innerHTML = '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
+          return;
+        }
+
         for (let i = 0; i < clients.length; i++) {
           const client = clients[i];
           const trackingInfo = await fetchTrackingInfo(client.trackingCode);
 
           let statusClass = "status-agendado";
-          if (client.delivered) statusClass = "status-entregue";
-          else if (trackingInfo.status.toLowerCase().includes("trânsito"))
+          let statusText = client.status;
+          
+          if (client.delivered) {
+            statusClass = "status-entregue";
+            statusText = "Entregue";
+          } else if (trackingInfo.status.toLowerCase().includes("trânsito") || 
+                     trackingInfo.status.toLowerCase().includes("rota")) {
             statusClass = "status-transito";
+            statusText = "Em trânsito";
+          }
+
+          // Extrair número de telefone do link do WhatsApp
+          let phoneNumber = "";
+          if (client.contact && client.contact.includes("phone=")) {
+            const match = client.contact.match(/phone=(\d+)/);
+            if (match && match[1]) {
+              phoneNumber = match[1];
+            }
+          }
 
           const card = document.createElement("div");
           card.className = "client-card";
           card.innerHTML = `
           <div class="card-header">
             <h3>${client.name}</h3>
-            <span class="status-badge ${statusClass}">
-              ${client.delivered ? "Entregue" : trackingInfo.status}
-            </span>
+            <span class="status-badge ${statusClass}">${statusText}</span>
           </div>
           <div class="card-body">
-            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(
-              client.date
-            )}</span></div>
-            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(
-              client.value
-            )}</span></div>
-            <div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${
-              client.time || "-"
-            }</span></div>
-            <div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${
-              client.trackingCode || "-"
-            }</span></div>
+            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(client.date)}</span></div>
+            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(client.value)}</span></div>
+            ${client.time ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>` : ''}
+            ${client.trackingCode ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>` : ''}
             <div class="tracking-info">
               <h4><i class="fas fa-truck"></i> Rastreamento</h4>
               <p><strong>Status:</strong> ${trackingInfo.status}</p>
               <p><strong>Previsão:</strong> ${trackingInfo.deliveryDate}</p>
+              ${trackingInfo.events.length > 0 ? `
               <div class="tracking-events">
-                ${trackingInfo.events
-                  .map(
-                    (ev) =>
-                      `<p><small>${ev.date} - ${ev.location}<br>${ev.description}</small></p>`
-                  )
-                  .join("")}
+                ${trackingInfo.events.slice(0, 3).map(
+                  (ev) => `<p><small>${ev.date} - ${ev.location}<br>${ev.description}</small></p>`
+                ).join("")}
               </div>
+              ` : ''}
             </div>
             <div style="margin-top:15px;display:flex;justify-content:space-between;">
-              <a href="https://wa.me/${
-                client.contact
-              }" target="_blank" class="btn" style="background:#25D366;">
+              ${phoneNumber ? `
+              <a href="https://wa.me/${phoneNumber}" target="_blank" class="btn" style="background:#25D366;">
                 <i class="fab fa-whatsapp"></i> Contatar
               </a>
+              ` : ''}
+              ${!client.delivered ? `
               <button class="btn" onclick="markAsDelivered(${i})">
                 <i class="fas fa-check"></i> Entregue
               </button>
+              ` : ''}
             </div>
           </div>`;
           grid.appendChild(card);
@@ -451,67 +507,71 @@
         const totalRevenue = clients.reduce((sum, c) => sum + c.value, 0);
         const totalCommission = totalRevenue * 0.55;
         const deliveredCount = clients.filter((c) => c.delivered).length;
-        const transitCount = clients.filter((c) => !c.delivered).length;
-        document.getElementById("totalRevenue").textContent =
-          formatCurrency(totalRevenue);
-        document.getElementById("totalCommission").textContent =
-          formatCurrency(totalCommission);
+        const transitCount = clients.filter((c) => !c.delivered && c.trackingCode).length;
+        
+        document.getElementById("totalRevenue").textContent = formatCurrency(totalRevenue);
+        document.getElementById("totalCommission").textContent = formatCurrency(totalCommission);
         document.getElementById("deliveredCount").textContent = deliveredCount;
         document.getElementById("totalCount").textContent = clients.length;
         document.getElementById("transitCount").textContent = transitCount;
       }
 
       function markAsDelivered(index) {
-        clientData[index].delivered = true;
-        renderClientCards(clientData);
-        alert(`Pedido de ${clientData[index].name} marcado como entregue!`);
-        // 👉 aqui você pode chamar um GScript para atualizar a planilha
+        if (confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)) {
+          clientData[index].delivered = true;
+          renderClientCards(clientData);
+          // Aqui você precisaria adicionar código para atualizar a planilha
+          alert(`Pedido de ${clientData[index].name} marcado como entregue localmente!`);
+        }
       }
 
       function filterCards() {
-        const nameFilter = document
-          .getElementById("searchName")
-          .value.toLowerCase();
+        const nameFilter = document.getElementById("searchName").value.toLowerCase();
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
         const statusFilter = document.getElementById("statusFilter").value;
 
         const filtered = clientData.filter((c) => {
-          if (nameFilter && !c.name.toLowerCase().includes(nameFilter))
-            return false;
-          if (startDate && c.date < startDate) return false;
-          if (endDate && c.date > endDate) return false;
+          if (nameFilter && !c.name.toLowerCase().includes(nameFilter)) return false;
+          
+          if (startDate && c.date) {
+            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            if (clientDate < startDate) return false;
+          }
+          
+          if (endDate && c.date) {
+            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            if (clientDate > endDate) return false;
+          }
+          
           if (statusFilter !== "all") {
             if (statusFilter === "Entregue" && !c.delivered) return false;
-            if (statusFilter === "Em trânsito" && c.delivered) return false;
-            if (
-              statusFilter === "Agendado" &&
-              (c.delivered || c.status !== "Agendado")
-            )
-              return false;
+            if (statusFilter === "Em trânsito" && (c.delivered || !c.trackingCode)) return false;
+            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode)) return false;
           }
+          
           return true;
         });
+        
         renderClientCards(filtered);
       }
 
+      // Inicialização
       document.addEventListener("DOMContentLoaded", () => {
+        // Definir datas padrão para o filtro (últimos 30 dias)
         const today = new Date();
-        const ago = new Date();
-        ago.setDate(today.getDate() - 30);
-        document.getElementById("startDate").value = ago
-          .toISOString()
-          .split("T")[0];
-        document.getElementById("endDate").value = today
-          .toISOString()
-          .split("T")[0];
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        
+        document.getElementById("startDate").value = thirtyDaysAgo.toISOString().split("T")[0];
+        document.getElementById("endDate").value = today.toISOString().split("T")[0];
+        
+        // Carregar dados iniciais
         loadClientData();
-        document
-          .getElementById("filterBtn")
-          .addEventListener("click", filterCards);
-        document
-          .getElementById("refreshBtn")
-          .addEventListener("click", loadClientData);
+        
+        // Configurar event listeners
+        document.getElementById("filterBtn").addEventListener("click", filterCards);
+        document.getElementById("refreshBtn").addEventListener("click", loadClientData);
         document.getElementById("searchName").addEventListener("keyup", (e) => {
           if (e.key === "Enter") filterCards();
         });
