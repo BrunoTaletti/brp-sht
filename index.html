@@ -205,7 +205,7 @@
         border-radius: 3px;
         margin: 10px 0;
         overflow: hidden;
-      }
+  }
       .progress {
         height: 100%;
         background-color: var(--primary);
@@ -344,15 +344,14 @@
 
     <footer>
       <div class="container">
-        <p>Dashboard Nervolaris &copy; 2025 - Gerenciamento de entregas</p>
+        <p>Dashboard Nervolaris &copy; 2025 - Gerenciamento de <a href="https://www.siterastreio.com.br/" target="_blank">Rastreamento</a></p>
       </div>
     </footer>
 
     <script>
       // ====== CONFIG ======
-      const SHEET_URL = "https://script.google.com/macros/s/AKfycbw2uxGJMQAArXTOoLDyDwQLytxnz-59UXVLj9FnL3VJ1XLGPD_HOJdHUkp4kF8xvIcgjw/exec";
-      const WONCA_API_KEY = "7QwcqrgzJGuy675n4UKHSMzH0SXTFW1jMoV062-f8Gs";
-      const WONCA_API_URL = "https://api-labs.wonca.com.br/wonca.labs.v1.LabsService/Track";
+      const SHEET_URL = "https://script.google.com/macros/s/AKfycbx-v2n9NnCOY0ap6xHenzShrxTLXwjUkNWBtr90IOiVOcKx8BBNPVqXTY-awUdrj4ZZHw/exec";
+      const TRACK_PROXY_URL = "https://script.google.com/macros/s/AKfycbx-v2n9NnCOY0ap6xHenzShrxTLXwjUkNWBtr90IOiVOcKx8BBNPVqXTY-awUdrj4ZZHw/exec";
 
       let clientData = [];
 
@@ -402,14 +401,13 @@
       function formatDate(dateString) {
         if (!dateString) return "-";
         try {
-          // Tenta converter para data - o formato pode variar
           const date = new Date(dateString);
-          if (isNaN(date.getTime())) return dateString; // Se não for uma data válida, retorna o original
+          if (isNaN(date.getTime())) return dateString;
           
           const options = { day: "2-digit", month: "2-digit", year: "numeric" };
           return date.toLocaleDateString("pt-BR", options);
         } catch (e) {
-          return dateString; // Em caso de erro, retorna o valor original
+          return dateString;
         }
       }
 
@@ -424,11 +422,11 @@
         }
         
         try {
-          const response = await fetch(WONCA_API_URL, {
+          // Usar o Google Apps Script como proxy para evitar CORS
+          const response = await fetch(TRACK_PROXY_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Apikey ${WONCA_API_KEY}`
             },
             body: JSON.stringify({ code: trackingCode })
           });
@@ -439,24 +437,32 @@
           
           const data = await response.json();
           
-          // Verificar se a API retornou dados válidos
-          if (data && data.tracks && data.tracks.length > 0) {
-            const track = data.tracks[0];
-            const events = track.trackEvents || [];
+          // Verificar se a API retornou um erro
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          // Processar a resposta da Wonca API (baseado no exemplo que você forneceu)
+          if (data && data.json) {
+            const trackingData = JSON.parse(data.json);
             
-            // Verificar se o pacote foi entregue
+            // Extrair informações relevantes
+            const events = trackingData.eventos || [];
             const isDelivered = events.some(event => 
-              event.status && event.status.toLowerCase().includes("entregue")
+              event.descricao && event.descricao.toLowerCase().includes("entregue")
             );
             
+            // Encontrar o último evento para mostrar o status atual
+            const lastEvent = events.length > 0 ? events[0] : null;
+            
             return {
-              status: track.lastStatus || "Status desconhecido",
-              deliveryDate: track.estimatedDeliveryDate || "Sem previsão",
+              status: lastEvent ? lastEvent.descricao : "Status desconhecido",
+              deliveryDate: trackingData.dtPrevista || "Sem previsão",
               events: events.map(event => ({
-                date: event.eventDate || "",
-                location: event.eventLocation || "",
-                description: event.status || "",
-                details: event.eventDescription || ""
+                date: event.dtHrCriado ? event.dtHrCriado.date : "",
+                location: event.unidade ? event.unidade.endereco.cidade + " - " + event.unidade.endereco.uf : "",
+                description: event.descricao || "",
+                details: event.detalhe || ""
               })),
               isDelivered: isDelivered
             };
@@ -505,7 +511,8 @@
             statusText = "Entregue";
           } else if (trackingInfo.status.toLowerCase().includes("trânsito") || 
                      trackingInfo.status.toLowerCase().includes("rota") ||
-                     trackingInfo.status.toLowerCase().includes("entrega")) {
+                     trackingInfo.status.toLowerCase().includes("entrega") ||
+                     trackingInfo.status.toLowerCase().includes("expedido")) {
             statusClass = "status-transito";
             statusText = trackingInfo.status;
           } else if (client.delivered) {
@@ -544,9 +551,9 @@
                 ${trackingInfo.events.slice(0, 3).map(
                   (ev) => `
                   <div class="event-item">
-                    <div class="event-date">${ev.date}</div>
-                    <div class="event-location">${ev.location}</div>
-                    <div class="event-status">${ev.description}</div>
+                    <div class="event-date">${ev.date ? new Date(ev.date).toLocaleString('pt-BR') : 'Data não disponível'}</div>
+                    <div class="event-location">${ev.location || 'Local não disponível'}</div>
+                    <div class="event-status">${ev.description || 'Sem descrição'}</div>
                     ${ev.details ? `<div><small>${ev.details}</small></div>` : ''}
                   </div>
                   `
