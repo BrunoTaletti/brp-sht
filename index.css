@@ -55,6 +55,11 @@ a{
   margin-right: 10px;
   font-size: 32px;
 }
+
+.logo-icon{
+  rotate: -6deg;
+}
+
 .stats {
   display: flex;
   gap: 20px;
