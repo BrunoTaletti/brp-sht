@@ -124,6 +124,10 @@
       .btn:hover {
         background-color: var(--secondary);
       }
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 14px;
+      }
       .client-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -159,6 +163,7 @@
         width: 30px;
         color: var(--primary);
         font-size: 18px;
+        flex-shrink: 0;
       }
       .card-field span {
         flex: 1;
@@ -248,6 +253,7 @@
         border-left: 3px solid var(--primary);
         padding-left: 10px;
         margin-bottom: 10px;
+        font-size: 13px;
       }
       .event-date {
         font-weight: bold;
@@ -255,10 +261,9 @@
       }
       .event-location {
         color: var(--gray);
-        font-size: 0.9em;
       }
       .event-status {
-        margin-top: 5px;
+        margin-top: 3px;
       }
       .error-message {
         background-color: #ffebee;
@@ -267,6 +272,23 @@
         border-radius: 8px;
         margin: 10px 0;
         text-align: center;
+      }
+      .consultar-btn {
+        background-color: #ff9800;
+      }
+      .consultar-btn:hover {
+        background-color: #f57c00;
+      }
+      .card-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .action-group {
+        display: flex;
+        gap: 10px;
       }
     </style>
   </head>
@@ -358,64 +380,71 @@
 
     <script>
       // ====== CONFIG ======
-      const SHEET_URL = "https://script.google.com/macros/s/AKfycbyS6E_2nHbFSxRGJzLjWapbNqI56gpx7ZbKZr_-bpThmX8VhIX20OHNZIbIJJmA88Jskg/exec";
-      const WONCA_AK = "7QwcqrgzJGuy675n4UKHSMzH0SXTFW1jMoV062-f8Gs";
-      const WONCA_API_URL = "https://api-labs.wonca.com.br/wonca.labs.v1.LabsService/Track";
+      const SHEET_URL =
+        "https://script.google.com/macros/s/AKfycbztUVMAuSWdFZ93JwVHPs7BcszLn9h7BkaTxFlMKXF0vF8FaoEdN-cnv__32x-LjayE-w/exec";
+      const WONCA_API_KEY = "7QwcqrgzJGuy675n4UKHSMzH0SXTFW1jMoV062-f8Gs";
+      const WONCA_API_URL = 
+        "https://api-labs.wonca.com.br/wonca.labs.v1.LabsService/Track";
+
+      // Servidores CORS Anywhere (várias opções)
+      const CORS_PROXIES = [
+        "https://cors-anywhere.herokuapp.com/",
+        "https://api.codetabs.com/v1/proxy?quest=",
+        "https://corsproxy.io/?",
+        "https://proxy.cors.sh/",
+        "https://crossorigin.me/",
+      ];
 
       let clientData = [];
+      let currentCorsProxy = CORS_PROXIES[0];
+      // Cache para armazenar consultas já realizadas
+      const trackingCache = new Map();
 
       async function loadClientData() {
         try {
-          document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
-          
-          // Primeiro, tentar carregar via JSONP
-          try {
-            await loadWithJsonp();
-          } catch (jsonpError) {
-            console.warn("JSONP falhou, tentando fetch normal:", jsonpError);
-            // Se JSONP falhar, tentar fetch normal
-            const res = await fetch(SHEET_URL);
-            const data = await res.json();
-            processClientData(data);
-          }
+          document.getElementById("clientGrid").innerHTML =
+            '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
+
+          // Tentar carregar dados com CORS proxy
+          const data = await fetchWithCorsProxy(SHEET_URL);
+          processClientData(data);
         } catch (error) {
           console.error("Erro ao carregar dados:", error);
-          document.getElementById('clientGrid').innerHTML = `<div class="error-message"><i class='fas fa-exclamation-triangle'></i> Erro ao carregar dados: ${error.message}</div>`;
+          document.getElementById(
+            "clientGrid"
+          ).innerHTML = `<div class="error-message"><i class='fas fa-exclamation-triangle'></i> Erro ao carregar dados: ${error.message}</div>`;
         }
       }
 
-      // Função para carregar dados via JSONP
-      function loadWithJsonp() {
-        return new Promise((resolve, reject) => {
-          // Criar callback única para esta requisição
-          const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-          
-          window[callbackName] = function(data) {
-            delete window[callbackName];
-            document.body.removeChild(script);
-            processClientData(data);
-            resolve();
-          };
-          
-          // Adicionar timeout
-          const timeout = setTimeout(() => {
-            delete window[callbackName];
-            document.body.removeChild(script);
-            reject(new Error("Timeout ao carregar dados"));
-          }, 10000);
-          
-          // Criar script para JSONP
-          const script = document.createElement('script');
-          script.src = `${SHEET_URL}?callback=${callbackName}`;
-          
-          script.onerror = function() {
-            clearTimeout(timeout);
-            delete window[callbackName];
-            reject(new Error("Erro ao carregar script"));
-          };
-          
-          document.body.appendChild(script);
-        });
+      // Função para fazer fetch com CORS proxy
+      async function fetchWithCorsProxy(url, options = {}) {
+        let lastError = null;
+
+        // Tentar cada proxy até um funcionar
+        for (const proxy of CORS_PROXIES) {
+          try {
+            const proxyUrl = proxy + encodeURIComponent(url);
+            console.log("Tentando proxy:", proxy);
+
+            const response = await fetch(proxyUrl, options);
+
+            if (!response.ok) {
+              throw new Error(`Erro HTTP: ${response.status}`);
+            }
+
+            const data = await response.json();
+            currentCorsProxy = proxy; // Usar este proxy daqui para frente
+            return data;
+          } catch (error) {
+            console.warn(`Proxy ${proxy} falhou:`, error);
+            lastError = error;
+            continue; // Tentar próximo proxy
+          }
+        }
+
+        throw new Error(
+          `Todos os proxies CORS falharam: ${lastError?.message}`
+        );
       }
 
       function processClientData(data) {
@@ -425,22 +454,29 @@
         }
 
         // Mapear os dados para o formato esperado
-        clientData = data.map(row => ({
-          name: row.name || "Não informado",
-          date: row.date,
-          contact: row.contact || "",
-          value: parseFloat(row.value || 0),
-          time: row.time || "",
-          status: row.status || "Agendado",
-          trackingCode: row.trackingCode || "",
-          delivered: row.delivered === true || 
-                    row.delivered === "TRUE" || 
-                    row.delivered === "Verdadeiro" ||
-                    (typeof row.delivered === "string" && row.delivered.toLowerCase() === "true")
+        clientData = data.map((row) => ({
+          name: row.name || row["NOME DO CLIENTE"] || "Não informado",
+          date: row.date || row["DATA"],
+          contact: row.contact || row["CONTATO"] || "",
+          value: parseFloat(row.value || row["VALOR"] || 0),
+          time: row.time || row["TEMPO"] || "",
+          status: row.status || row["STATUS"] || "Agendado",
+          trackingCode: row.trackingCode || row["RASTREIO"] || "",
+          delivered:
+            row.delivered === true ||
+            row.delivered === "TRUE" ||
+            row.delivered === "Verdadeiro" ||
+            row["ENTREGUE"] === true ||
+            row["ENTREGUE"] === "TRUE" ||
+            (typeof row.delivered === "string" &&
+              row.delivered.toLowerCase() === "true") ||
+            (typeof row["ENTREGUE"] === "string" &&
+              row["ENTREGUE"].toLowerCase() === "true"),
         }));
 
         if (clientData.length === 0) {
-          document.getElementById('clientGrid').innerHTML = '<div class="loading">Nenhum dado encontrado na planilha.</div>';
+          document.getElementById("clientGrid").innerHTML =
+            '<div class="loading">Nenhum dado encontrado na planilha.</div>';
           return;
         }
 
@@ -450,15 +486,27 @@
       function formatCurrency(value) {
         return value.toFixed(2).replace(".", ",");
       }
-      
+
       function formatDate(dateString) {
         if (!dateString) return "-";
         try {
-          const date = new Date(dateString);
-          if (isNaN(date.getTime())) return dateString;
-          
+          // Converter string de data para objeto Date
+          let dateObj;
+          if (
+            typeof dateString === "string" &&
+            dateString.includes("00:00:00")
+          ) {
+            dateObj = new Date(dateString);
+          } else {
+            // Tentar converter de formato brasileiro
+            const [day, month, year] = dateString.split("/");
+            dateObj = new Date(`${year}-${month}-${day}`);
+          }
+
+          if (isNaN(dateObj.getTime())) return dateString;
+
           const options = { day: "2-digit", month: "2-digit", year: "numeric" };
-          return date.toLocaleDateString("pt-BR", options);
+          return dateObj.toLocaleDateString("pt-BR", options);
         } catch (e) {
           return dateString;
         }
@@ -466,105 +514,226 @@
 
       async function fetchTrackingInfo(trackingCode) {
         if (!trackingCode || trackingCode.trim() === "") {
-          return { 
-            status: "Sem código de rastreio", 
-            deliveryDate: "-", 
+          return {
+            status: "Sem código de rastreio",
+            deliveryDate: "-",
             events: [],
-            isDelivered: false
+            isDelivered: false,
           };
         }
-        
+
+        // Verificar se já temos esta consulta em cache
+        if (trackingCache.has(trackingCode)) {
+          console.log("Retornando dados do cache para:", trackingCode);
+          return trackingCache.get(trackingCode);
+        }
+
         try {
-          // Usar a API Wonca diretamente
-          const response = await fetch(WONCA_API_URL, {
-            method: 'POST',
+          // Usar a API Wonca com proxy CORS
+          const response = await fetchWithCorsProxy(WONCA_API_URL, {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Apikey ${WONCA_AK}`
+              "Content-Type": "application/json",
+              Authorization: `Apikey ${WONCA_API_KEY}`,
             },
-            body: JSON.stringify({ code: trackingCode })
+            body: JSON.stringify({ code: trackingCode }),
           });
-          
-          if (!response.ok) {
-            throw new Error(`Erro na API: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
+
           // Processar a resposta da Wonca API
-          if (data && data.json) {
-            const trackingData = JSON.parse(data.json);
-            
+          if (response && response.json) {
+            const trackingData = JSON.parse(response.json);
+
             // Extrair informações relevantes
             const events = trackingData.eventos || [];
-            const isDelivered = events.some(event => 
-              event.descricao && event.descricao.toLowerCase().includes("entregue")
+            const isDelivered = events.some(
+              (event) =>
+                event.descricao &&
+                event.descricao.toLowerCase().includes("entregue")
             );
-            
+
             // Encontrar o último evento para mostrar o status atual
             const lastEvent = events.length > 0 ? events[0] : null;
-            
-            return {
+
+            const result = {
               status: lastEvent ? lastEvent.descricao : "Status desconhecido",
               deliveryDate: trackingData.dtPrevista || "Sem previsão",
-              events: events.map(event => ({
+              events: events.map((event) => ({
                 date: event.dtHrCriado ? event.dtHrCriado.date : "",
-                location: event.unidade ? (event.unidade.endereco ? event.unidade.endereco.cidade + " - " + event.unidade.endereco.uf : "") : "",
+                location: event.unidade
+                  ? event.unidade.endereco
+                    ? `${event.unidade.endereco.cidade || ""}${
+                        event.unidade.endereco.uf
+                          ? " - " + event.unidade.endereco.uf
+                          : ""
+                      }`
+                    : ""
+                  : "",
                 description: event.descricao || "",
-                details: event.detalhe || ""
+                details: event.detalhe || "",
               })),
-              isDelivered: isDelivered
+              isDelivered: isDelivered,
             };
+
+            // Armazenar no cache
+            trackingCache.set(trackingCode, result);
+            return result;
           } else {
-            return { 
-              status: "Código não encontrado", 
-              deliveryDate: "-", 
+            const result = {
+              status: "Código não encontrado",
+              deliveryDate: "-",
               events: [],
-              isDelivered: false
+              isDelivered: false,
             };
+            trackingCache.set(trackingCode, result);
+            return result;
           }
         } catch (error) {
-          console.error("Erro ao buscar rastreio:", error, "Código:", trackingCode);
-          return { 
-            status: "Erro na consulta", 
-            deliveryDate: "-", 
+          console.error(
+            "Erro ao buscar rastreio:",
+            error,
+            "Código:",
+            trackingCode
+          );
+          const result = {
+            status: "Erro na consulta",
+            deliveryDate: "-",
             events: [],
-            isDelivered: false
+            isDelivered: false,
           };
+          trackingCache.set(trackingCode, result);
+          return result;
         }
       }
 
-      async function renderClientCards(clients) {
+      async function consultarRastreio(index, button) {
+        const client = clientData[index];
+        if (!client.trackingCode) {
+          alert("Este cliente não possui código de rastreio.");
+          return;
+        }
+
+        // Mostrar loading no botão
+        const originalText = button.innerHTML;
+        button.innerHTML =
+          '<i class="fas fa-spinner fa-spin"></i> Consultando...';
+        button.disabled = true;
+
+        try {
+          const trackingInfo = await fetchTrackingInfo(client.trackingCode);
+
+          // Atualizar o status do cliente com base na consulta
+          if (trackingInfo.isDelivered) {
+            clientData[index].delivered = true;
+            clientData[index].status = "Entregue";
+          }
+
+          // Atualizar apenas o card específico
+          updateClientCard(index, trackingInfo);
+        } catch (error) {
+          console.error("Erro na consulta:", error);
+          alert("Erro ao consultar rastreio: " + error.message);
+        } finally {
+          // Restaurar o botão
+          button.innerHTML = originalText;
+          button.disabled = false;
+        }
+      }
+
+      function updateClientCard(index, trackingInfo) {
+        const client = clientData[index];
+        const card = document.getElementById(`client-card-${index}`);
+        if (!card) return;
+
+        let statusClass = "status-agendado";
+        let statusText = client.status;
+
+        // Priorizar informações dos correios sobre o status
+        if (trackingInfo.isDelivered) {
+          statusClass = "status-entregue";
+          statusText = "Entregue";
+        } else if (
+          trackingInfo.status.toLowerCase().includes("trânsito") ||
+          trackingInfo.status.toLowerCase().includes("rota") ||
+          trackingInfo.status.toLowerCase().includes("entrega") ||
+          trackingInfo.status.toLowerCase().includes("expedido")
+        ) {
+          statusClass = "status-transito";
+          statusText = trackingInfo.status;
+        } else if (client.delivered) {
+          statusClass = "status-entregue";
+          statusText = "Entregue";
+        }
+
+        // Atualizar a seção de rastreamento do card
+        const trackingSection = card.querySelector(".tracking-info");
+        if (trackingSection) {
+          trackingSection.innerHTML = `
+            <h4><i class="fas fa-truck"></i> Rastreamento</h4>
+            <p><strong>Status:</strong> ${trackingInfo.status}</p>
+            <p><strong>Previsão de entrega:</strong> ${
+              trackingInfo.deliveryDate
+            }</p>
+            ${
+              trackingInfo.events.length > 0
+                ? `
+            <div style="margin-top: 10px;">
+              <h4><i class="fas fa-history"></i> Últimas atualizações</h4>
+              ${trackingInfo.events
+                .slice(0, 3)
+                .map(
+                  (ev) => `
+                <div class="event-item">
+                  <div class="event-date">${
+                    ev.date
+                      ? new Date(ev.date).toLocaleString("pt-BR")
+                      : "Data não disponível"
+                  }</div>
+                  ${
+                    ev.location
+                      ? `<div class="event-location">${ev.location}</div>`
+                      : ""
+                  }
+                  <div class="event-status">${
+                    ev.description || "Sem descrição"
+                  }</div>
+                  ${ev.details ? `<div><small>${ev.details}</small></div>` : ""}
+                </div>
+                `
+                )
+                .join("")}
+            </div>
+            `
+                : ""
+            }
+          `;
+        }
+
+        // Atualizar o badge de status
+        const statusBadge = card.querySelector(".status-badge");
+        if (statusBadge) {
+          statusBadge.className = `status-badge ${statusClass}`;
+          statusBadge.textContent = statusText;
+        }
+      }
+
+      function renderClientCards(clients) {
         const grid = document.getElementById("clientGrid");
         grid.innerHTML = "";
         updateStats(clients);
 
         if (clients.length === 0) {
-          grid.innerHTML = '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
+          grid.innerHTML =
+            '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
           return;
         }
 
-        // Mostrar mensagem de carregamento
-        grid.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando informações de rastreamento...</div>';
-
         for (let i = 0; i < clients.length; i++) {
           const client = clients[i];
-          const trackingInfo = await fetchTrackingInfo(client.trackingCode);
 
           let statusClass = "status-agendado";
           let statusText = client.status;
-          
-          // Priorizar informações dos correios sobre o status
-          if (trackingInfo.isDelivered) {
-            statusClass = "status-entregue";
-            statusText = "Entregue";
-          } else if (trackingInfo.status.toLowerCase().includes("trânsito") || 
-                     trackingInfo.status.toLowerCase().includes("rota") ||
-                     trackingInfo.status.toLowerCase().includes("entrega") ||
-                     trackingInfo.status.toLowerCase().includes("expedido")) {
-            statusClass = "status-transito";
-            statusText = trackingInfo.status;
-          } else if (client.delivered) {
+
+          if (client.delivered) {
             statusClass = "status-entregue";
             statusText = "Entregue";
           }
@@ -576,51 +745,72 @@
             if (match && match[1]) {
               phoneNumber = match[1];
             }
+          } else if (client.contact && client.contact.includes("wa.me")) {
+            const match = client.contact.match(/wa.me\/(\d+)/);
+            if (match && match[1]) {
+              phoneNumber = match[1];
+            }
           }
 
           const card = document.createElement("div");
           card.className = "client-card";
+          card.id = `client-card-${i}`;
           card.innerHTML = `
           <div class="card-header">
             <h3>${client.name}</h3>
             <span class="status-badge ${statusClass}">${statusText}</span>
           </div>
           <div class="card-body">
-            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(client.date)}</span></div>
-            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(client.value)}</span></div>
-            ${client.time ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>` : ''}
-            ${client.trackingCode ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>` : ''}
+            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(
+              client.date
+            )}</span></div>
+            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(
+              client.value
+            )}</span></div>
+            ${
+              client.time
+                ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>`
+                : ""
+            }
+            ${
+              client.trackingCode
+                ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>`
+                : ""
+            }
             <div class="tracking-info">
               <h4><i class="fas fa-truck"></i> Rastreamento</h4>
-              <p><strong>Status:</strong> ${trackingInfo.status}</p>
-              <p><strong>Previsão de entrega:</strong> ${trackingInfo.deliveryDate}</p>
-              ${trackingInfo.events.length > 0 ? `
-              <div style="margin-top: 10px;">
-                <h4><i class="fas fa-history"></i> Últimas atualizações</h4>
-                ${trackingInfo.events.slice(0, 3).map(
-                  (ev) => `
-                  <div class="event-item">
-                    <div class="event-date">${ev.date ? new Date(ev.date).toLocaleString('pt-BR') : 'Data não disponível'}</div>
-                    <div class="event-location">${ev.location || 'Local não disponível'}</div>
-                    <div class="event-status">${ev.description || 'Sem descrição'}</div>
-                    ${ev.details ? `<div><small>${ev.details}</small></div>` : ''}
-                  </div>
-                  `
-                ).join("")}
-              </div>
-              ` : ''}
+              <p>Clique em "Consultar" para verificar o status atual</p>
             </div>
-            <div style="margin-top:15px;display:flex;justify-content:space-between;">
-              ${phoneNumber ? `
-              <a href="https://wa.me/${phoneNumber}" target="_blank" class="btn" style="background:#25D366;">
-                <i class="fab fa-whatsapp"></i> Contatar
-              </a>
-              ` : ''}
-              ${!client.delivered && !trackingInfo.isDelivered ? `
-              <button class="btn" onclick="markAsDelivered(${i})">
+            <div class="card-actions">
+              <div class="action-group">
+                ${
+                  phoneNumber
+                    ? `
+                <a href="https://wa.me/${phoneNumber}" target="_blank" class="btn btn-sm" style="background:#25D366;">
+                  <i class="fab fa-whatsapp"></i> Contatar
+                </a>
+                `
+                    : ""
+                }
+                ${
+                  client.trackingCode
+                    ? `
+                <button class="btn btn-sm consultar-btn" onclick="consultarRastreio(${i}, this)">
+                  <i class="fas fa-search"></i> Consultar
+                </button>
+                `
+                    : ""
+                }
+              </div>
+              ${
+                !client.delivered
+                  ? `
+              <button class="btn btn-sm" onclick="markAsDelivered(${i})">
                 <i class="fas fa-check"></i> Entregue
               </button>
-              ` : ''}
+              `
+                  : ""
+              }
             </div>
           </div>`;
           grid.appendChild(card);
@@ -631,51 +821,87 @@
         const totalRevenue = clients.reduce((sum, c) => sum + c.value, 0);
         const totalCommission = totalRevenue * 0.55;
         const deliveredCount = clients.filter((c) => c.delivered).length;
-        const transitCount = clients.filter((c) => !c.delivered && c.trackingCode).length;
-        
-        document.getElementById("totalRevenue").textContent = formatCurrency(totalRevenue);
-        document.getElementById("totalCommission").textContent = formatCurrency(totalCommission);
+        const transitCount = clients.filter(
+          (c) => !c.delivered && c.trackingCode
+        ).length;
+
+        document.getElementById("totalRevenue").textContent =
+          formatCurrency(totalRevenue);
+        document.getElementById("totalCommission").textContent =
+          formatCurrency(totalCommission);
         document.getElementById("deliveredCount").textContent = deliveredCount;
         document.getElementById("totalCount").textContent = clients.length;
         document.getElementById("transitCount").textContent = transitCount;
       }
 
       function markAsDelivered(index) {
-        if (confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)) {
+        if (
+          confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)
+        ) {
           clientData[index].delivered = true;
-          renderClientCards(clientData);
-          alert(`Pedido de ${clientData[index].name} marcado como entregue localmente!`);
+          clientData[index].status = "Entregue";
+
+          // Atualizar o card específico
+          const card = document.getElementById(`client-card-${index}`);
+          if (card) {
+            const statusBadge = card.querySelector(".status-badge");
+            if (statusBadge) {
+              statusBadge.className = "status-badge status-entregue";
+              statusBadge.textContent = "Entregue";
+            }
+
+            // Remover botão de entregue
+            const deliveredButton = card.querySelector(
+              ".btn.btn-sm:last-child"
+            );
+            if (deliveredButton) {
+              deliveredButton.remove();
+            }
+          }
+
+          updateStats(clientData);
+          alert(
+            `Pedido de ${clientData[index].name} marcado como entregue localmente!`
+          );
         }
       }
 
       function filterCards() {
-        const nameFilter = document.getElementById("searchName").value.toLowerCase();
+        const nameFilter = document
+          .getElementById("searchName")
+          .value.toLowerCase();
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
         const statusFilter = document.getElementById("statusFilter").value;
 
         const filtered = clientData.filter((c) => {
-          if (nameFilter && !c.name.toLowerCase().includes(nameFilter)) return false;
-          
+          if (nameFilter && !c.name.toLowerCase().includes(nameFilter))
+            return false;
+
           if (startDate && c.date) {
-            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            const clientDate = new Date(c.date).toISOString().split("T")[0];
             if (clientDate < startDate) return false;
           }
-          
+
           if (endDate && c.date) {
-            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            const clientDate = new Date(c.date).toISOString().split("T")[0];
             if (clientDate > endDate) return false;
           }
-          
+
           if (statusFilter !== "all") {
             if (statusFilter === "Entregue" && !c.delivered) return false;
-            if (statusFilter === "Em trânsito" && (c.delivered || !c.trackingCode)) return false;
-            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode)) return false;
+            if (
+              statusFilter === "Em trânsito" &&
+              (c.delivered || !c.trackingCode)
+            )
+              return false;
+            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode))
+              return false;
           }
-          
+
           return true;
         });
-        
+
         renderClientCards(filtered);
       }
 
@@ -685,16 +911,24 @@
         const today = new Date();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
-        
-        document.getElementById("startDate").value = thirtyDaysAgo.toISOString().split("T")[0];
-        document.getElementById("endDate").value = today.toISOString().split("T")[0];
-        
+
+        document.getElementById("startDate").value = thirtyDaysAgo
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("endDate").value = today
+          .toISOString()
+          .split("T")[0];
+
         // Carregar dados iniciais
         loadClientData();
-        
+
         // Configurar event listeners
-        document.getElementById("filterBtn").addEventListener("click", filterCards);
-        document.getElementById("refreshBtn").addEventListener("click", loadClientData);
+        document
+          .getElementById("filterBtn")
+          .addEventListener("click", filterCards);
+        document
+          .getElementById("refreshBtn")
+          .addEventListener("click", loadClientData);
         document.getElementById("searchName").addEventListener("keyup", (e) => {
           if (e.key === "Enter") filterCards();
         });
