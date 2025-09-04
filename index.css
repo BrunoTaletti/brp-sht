@@ -18,6 +18,7 @@ body {
   background-color: #f5f7fb;
   color: var(--dark);
   line-height: 1.6;
+  padding: 2%;
 }
 .container {
   max-width: 1400px;
@@ -32,6 +33,12 @@ header {
   margin-bottom: 30px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
+a{
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
 .header-content {
   display: flex;
   justify-content: space-between;

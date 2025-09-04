@@ -8,15 +8,15 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <link rel="stylesheet" href="./index.css">
+    <link rel="stylesheet" href="./index.css" />
   </head>
   <body>
     <header>
       <div class="container">
         <div class="header-content">
           <div class="logo">
-            <i class="fas fa-box"></i>
-            <span>Dashboard Nervolaris</span>
+            <i class="fa-solid fa-kiwi-bird"></i>
+            <span>CashONE</span>
           </div>
           <div class="header-actions">
             <button class="btn" id="refreshBtn">
@@ -52,7 +52,11 @@
       <div class="filters">
         <div class="filter-group">
           <label for="searchName">Buscar por nome</label>
-          <input type="text" id="searchName" placeholder="Digite o nome do cliente" />
+          <input
+            type="text"
+            id="searchName"
+            placeholder="Digite o nome do cliente"
+          />
         </div>
         <div class="filter-group">
           <label for="startDate">Data inicial</label>
@@ -88,14 +92,16 @@
 
     <footer>
       <div class="container">
-        <p>Dashboard Nervolaris &copy; 2025 - Gerenciamento de entregas</p>
+        <p>CashONE &copy; 2025 - Feito com 💙 por <a href="https://instagram.com/brunotaletti" target="_blank">Bruno Taletti</a></p>
       </div>
     </footer>
 
     <script>
       // ====== CONFIG ======
-      const SHEET_URL = "https://script.google.com/macros/s/AKfycbx07hefOXrjctLZj2YeqwCsXfjd6A7ph5AniqIO8WLQjeA9tpAZ4k5GGKjf34CJ5v8LQA/exec?action=getData";
-      const TRACK_URL = "https://script.google.com/macros/s/AKfycbx07hefOXrjctLZj2YeqwCsXfjd6A7ph5AniqIO8WLQjeA9tpAZ4k5GGKjf34CJ5v8LQA/exec?action=trackCode";
+      const SHEET_URL =
+        "https://script.google.com/macros/s/AKfycbyorLzPBQ3e3PXp6yZgzUZt7OvBzgWYO1wWNn2S67KqBEzJjqN9uZV0TysLkc2ha__n4Q/exec?action=getData";
+      const TRACK_URL =
+        "https://script.google.com/macros/s/AKfycbyorLzPBQ3e3PXp6yZgzUZt7OvBzgWYO1wWNn2S67KqBEzJjqN9uZV0TysLkc2ha__n4Q/exec?action=track";
 
       let clientData = [];
       // Cache para armazenar consultas já realizadas
@@ -103,21 +109,23 @@
 
       async function loadClientData() {
         try {
-          document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
-          
+          document.getElementById("clientGrid").innerHTML =
+            '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
+
           // Fazer requisição diretamente para a API do Google Apps Script
           const response = await fetch(SHEET_URL);
-          
+
           if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`);
           }
-          
+
           const data = await response.json();
           processClientData(data);
-          
         } catch (error) {
           console.error("Erro ao carregar dados:", error);
-          document.getElementById('clientGrid').innerHTML = `<div class="error-message"><i class='fas fa-exclamation-triangle'></i> Erro ao carregar dados: ${error.message}</div>`;
+          document.getElementById(
+            "clientGrid"
+          ).innerHTML = `<div class="error-message"><i class='fas fa-exclamation-triangle'></i> Erro ao carregar dados: ${error.message}</div>`;
         }
       }
 
@@ -128,7 +136,7 @@
         }
 
         // Mapear os dados para o formato esperado
-        clientData = data.dados.map(row => ({
+        clientData = data.dados.map((row) => ({
           name: row.nomeCliente || "Não informado",
           date: row.data,
           contact: row.contato || "",
@@ -136,17 +144,20 @@
           time: row.tempo || "",
           status: row.status || "Agendado",
           trackingCode: row.rastreio || "",
-          delivered: row.entregue === true || 
-                    row.entregue === "TRUE" || 
-                    (typeof row.entregue === "string" && row.entregue.toLowerCase() === "true"),
+          delivered:
+            row.entregue === true ||
+            row.entregue === "TRUE" ||
+            (typeof row.entregue === "string" &&
+              row.entregue.toLowerCase() === "true"),
           // Campos adicionais da sua nova API
           possivelFaturamento: row.possivelFaturamento,
           atendente: row.atendente,
-          valorRecebido: row.valorRecebido
+          valorRecebido: row.valorRecebido,
         }));
 
         if (clientData.length === 0) {
-          document.getElementById('clientGrid').innerHTML = '<div class="loading">Nenhum dado encontrado na planilha.</div>';
+          document.getElementById("clientGrid").innerHTML =
+            '<div class="loading">Nenhum dado encontrado na planilha.</div>';
           return;
         }
 
@@ -156,14 +167,14 @@
       function formatCurrency(value) {
         return value.toFixed(2).replace(".", ",");
       }
-      
+
       function formatDate(dateString) {
         if (!dateString) return "-";
         try {
           // A data vem no formato ISO (2025-08-28T07:00:00.000Z)
           const date = new Date(dateString);
           if (isNaN(date.getTime())) return dateString;
-          
+
           const options = { day: "2-digit", month: "2-digit", year: "numeric" };
           return date.toLocaleDateString("pt-BR", options);
         } catch (e) {
@@ -173,80 +184,92 @@
 
       async function fetchTrackingInfo(trackingCode) {
         if (!trackingCode || trackingCode.trim() === "") {
-          return { 
-            status: "Sem código de rastreio", 
-            deliveryDate: "-", 
+          return {
+            status: "Sem código de rastreio",
+            deliveryDate: "-",
             events: [],
-            isDelivered: false
+            isDelivered: false,
           };
         }
-        
+
         // Verificar se já temos esta consulta em cache
         if (trackingCache.has(trackingCode)) {
           console.log("Retornando dados do cache para:", trackingCode);
           return trackingCache.get(trackingCode);
         }
-        
+
         try {
-          // Fazer requisição diretamente para a API do Google Apps Script
-          const response = await fetch(TRACK_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ code: trackingCode })
-          });
-          
+          // Fazer requisição GET para a API do Google Apps Script
+          const response = await fetch(
+            `${TRACK_URL}&code=${encodeURIComponent(trackingCode)}`
+          );
+
           if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`);
           }
-          
+
           const data = await response.json();
-          
+
           // Processar a resposta da nossa API
           if (data && data.trackingData) {
             const trackingData = data.trackingData;
-            
+
             // Extrair informações relevantes
             const events = trackingData.eventos || [];
             const isDelivered = checkIfDelivered(trackingData);
-            
+
             // Encontrar o último evento para mostrar o status atual
             const lastEvent = events.length > 0 ? events[0] : null;
-            
+
             const result = {
-              status: lastEvent ? (lastEvent.descricaoFrontEnd || lastEvent.descricao || "Status desconhecido") : "Status desconhecido",
+              status: lastEvent
+                ? lastEvent.descricaoFrontEnd ||
+                  lastEvent.descricao ||
+                  "Status desconhecido"
+                : "Status desconhecido",
               deliveryDate: trackingData.dtPrevista || "Sem previsão",
-              events: events.map(event => ({
+              events: events.map((event) => ({
                 date: event.dtHrCriado ? event.dtHrCriado.date : "",
-                location: event.unidade ? (event.unidade.endereco ? `${event.unidade.endereco.cidade || ''}${event.unidade.endereco.uf ? ' - ' + event.unidade.endereco.uf : ''}` : "") : "",
+                location: event.unidade
+                  ? event.unidade.endereco
+                    ? `${event.unidade.endereco.cidade || ""}${
+                        event.unidade.endereco.uf
+                          ? " - " + event.unidade.endereco.uf
+                          : ""
+                      }`
+                    : ""
+                  : "",
                 description: event.descricaoFrontEnd || event.descricao || "",
-                details: event.detalhe || ""
+                details: event.detalhe || "",
               })),
-              isDelivered: isDelivered
+              isDelivered: isDelivered,
             };
-            
+
             // Armazenar no cache
             trackingCache.set(trackingCode, result);
             return result;
-            
           } else {
-            const result = { 
-              status: "Código não encontrado", 
-              deliveryDate: "-", 
+            const result = {
+              status: "Código não encontrado",
+              deliveryDate: "-",
               events: [],
-              isDelivered: false
+              isDelivered: false,
             };
             trackingCache.set(trackingCode, result);
             return result;
           }
         } catch (error) {
-          console.error("Erro ao buscar rastreio:", error, "Código:", trackingCode);
-          const result = { 
-            status: "Erro na consulta", 
-            deliveryDate: "-", 
+          console.error(
+            "Erro ao buscar rastreio:",
+            error,
+            "Código:",
+            trackingCode
+          );
+          const result = {
+            status: "Erro na consulta",
+            deliveryDate: "-",
             events: [],
-            isDelivered: false
+            isDelivered: false,
           };
           trackingCache.set(trackingCode, result);
           return result;
@@ -256,21 +279,27 @@
       // Função para verificar se foi entregue baseado na estrutura real
       function checkIfDelivered(trackingData) {
         // Verifica pela situação ou eventos de entrega
-        if (trackingData.situacao === 'BDE' || trackingData.temEventoEntrega) {
+        if (trackingData.situacao === "BDE" || trackingData.temEventoEntrega) {
           return true;
         }
-        
+
         // Verifica nos eventos se há algum indicativo de entrega
         if (trackingData.eventos && trackingData.eventos.length > 0) {
           const ultimoEvento = trackingData.eventos[0];
-          const descricao = (ultimoEvento.descricaoFrontEnd || ultimoEvento.descricao || '').toLowerCase();
-          
-          return descricao.includes('entregue') || 
-                 descricao.includes('entrega efetuada') ||
-                 descricao.includes('objeto entregue') ||
-                 descricao.includes('saiu para entrega');
+          const descricao = (
+            ultimoEvento.descricaoFrontEnd ||
+            ultimoEvento.descricao ||
+            ""
+          ).toLowerCase();
+
+          return (
+            descricao.includes("entregue") ||
+            descricao.includes("entrega efetuada") ||
+            descricao.includes("objeto entregue") ||
+            descricao.includes("saiu para entrega")
+          );
         }
-        
+
         return false;
       }
 
@@ -280,24 +309,24 @@
           alert("Este cliente não possui código de rastreio.");
           return;
         }
-        
+
         // Mostrar loading no botão
         const originalText = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando...';
+        button.innerHTML =
+          '<i class="fas fa-spinner fa-spin"></i> Consultando...';
         button.disabled = true;
-        
+
         try {
           const trackingInfo = await fetchTrackingInfo(client.trackingCode);
-          
+
           // Atualizar o status do cliente com base na consulta
           if (trackingInfo.isDelivered) {
             clientData[index].delivered = true;
             clientData[index].status = "Entregue";
           }
-          
+
           // Atualizar apenas o card específico
           updateClientCard(index, trackingInfo);
-          
         } catch (error) {
           console.error("Erro na consulta:", error);
           alert("Erro ao consultar rastreio: " + error.message);
@@ -312,53 +341,74 @@
         const client = clientData[index];
         const card = document.getElementById(`client-card-${index}`);
         if (!card) return;
-        
+
         let statusClass = "status-agendado";
         let statusText = client.status;
-        
+
         // Priorizar informações dos correios sobre o status
         if (trackingInfo.isDelivered) {
           statusClass = "status-entregue";
           statusText = "Entregue";
-        } else if (trackingInfo.status.toLowerCase().includes("trânsito") || 
-                  trackingInfo.status.toLowerCase().includes("rota") ||
-                  trackingInfo.status.toLowerCase().includes("entrega") ||
-                  trackingInfo.status.toLowerCase().includes("expedido") ||
-                  trackingInfo.status.toLowerCase().includes("saiu para entrega")) {
+        } else if (
+          trackingInfo.status.toLowerCase().includes("trânsito") ||
+          trackingInfo.status.toLowerCase().includes("rota") ||
+          trackingInfo.status.toLowerCase().includes("entrega") ||
+          trackingInfo.status.toLowerCase().includes("expedido") ||
+          trackingInfo.status.toLowerCase().includes("saiu para entrega")
+        ) {
           statusClass = "status-transito";
           statusText = trackingInfo.status;
         } else if (client.delivered) {
           statusClass = "status-entregue";
           statusText = "Entregue";
         }
-        
+
         // Atualizar a seção de rastreamento do card
-        const trackingSection = card.querySelector('.tracking-info');
+        const trackingSection = card.querySelector(".tracking-info");
         if (trackingSection) {
           trackingSection.innerHTML = `
             <h4><i class="fas fa-truck"></i> Rastreamento</h4>
             <p><strong>Status:</strong> ${trackingInfo.status}</p>
-            <p><strong>Previsão de entrega:</strong> ${trackingInfo.deliveryDate}</p>
-            ${trackingInfo.events.length > 0 ? `
+            <p><strong>Previsão de entrega:</strong> ${
+              trackingInfo.deliveryDate
+            }</p>
+            ${
+              trackingInfo.events.length > 0
+                ? `
             <div style="margin-top: 10px;">
               <h4><i class="fas fa-history"></i> Últimas atualizações</h4>
-              ${trackingInfo.events.slice(0, 3).map(
-                (ev) => `
+              ${trackingInfo.events
+                .slice(0, 3)
+                .map(
+                  (ev) => `
                 <div class="event-item">
-                  <div class="event-date">${ev.date ? new Date(ev.date).toLocaleString('pt-BR') : 'Data não disponível'}</div>
-                  ${ev.location ? `<div class="event-location">${ev.location}</div>` : ''}
-                  <div class="event-status">${ev.description || 'Sem descrição'}</div>
-                  ${ev.details ? `<div><small>${ev.details}</small></div>` : ''}
+                  <div class="event-date">${
+                    ev.date
+                      ? new Date(ev.date).toLocaleString("pt-BR")
+                      : "Data não disponível"
+                  }</div>
+                  ${
+                    ev.location
+                      ? `<div class="event-location">${ev.location}</div>`
+                      : ""
+                  }
+                  <div class="event-status">${
+                    ev.description || "Sem descrição"
+                  }</div>
+                  ${ev.details ? `<div><small>${ev.details}</small></div>` : ""}
                 </div>
                 `
-              ).join("")}
+                )
+                .join("")}
             </div>
-            ` : ''}
+            `
+                : ""
+            }
           `;
         }
-        
+
         // Atualizar o badge de status
-        const statusBadge = card.querySelector('.status-badge');
+        const statusBadge = card.querySelector(".status-badge");
         if (statusBadge) {
           statusBadge.className = `status-badge ${statusClass}`;
           statusBadge.textContent = statusText;
@@ -371,16 +421,17 @@
         updateStats(clients);
 
         if (clients.length === 0) {
-          grid.innerHTML = '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
+          grid.innerHTML =
+            '<div class="loading">Nenhum cliente encontrado com os filtros aplicados.</div>';
           return;
         }
 
         for (let i = 0; i < clients.length; i++) {
           const client = clients[i];
-          
+
           let statusClass = "status-agendado";
           let statusText = client.status;
-          
+
           if (client.delivered) {
             statusClass = "status-entregue";
             statusText = "Entregue";
@@ -414,32 +465,56 @@
             <span class="status-badge ${statusClass}">${statusText}</span>
           </div>
           <div class="card-body">
-            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(client.date)}</span></div>
-            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(client.value)}</span></div>
-            ${client.time ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>` : ''}
-            ${client.trackingCode ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>` : ''}
+            <div class="card-field"><i class="fas fa-calendar-alt"></i><span>Data: ${formatDate(
+              client.date
+            )}</span></div>
+            <div class="card-field"><i class="fas fa-dollar-sign"></i><span>Valor: R$ ${formatCurrency(
+              client.value
+            )}</span></div>
+            ${
+              client.time
+                ? `<div class="card-field"><i class="fas fa-clock"></i><span>Tempo: ${client.time} min</span></div>`
+                : ""
+            }
+            ${
+              client.trackingCode
+                ? `<div class="card-field"><i class="fas fa-barcode"></i><span>Código: ${client.trackingCode}</span></div>`
+                : ""
+            }
             <div class="tracking-info">
               <h4><i class="fas fa-truck"></i> Rastreamento</h4>
               <p>Clique em "Consultar" para verificar o status atual</p>
             </div>
             <div class="card-actions">
               <div class="action-group">
-                ${whatsappUrl ? `
+                ${
+                  whatsappUrl
+                    ? `
                 <a href="${whatsappUrl}" target="_blank" class="btn btn-sm" style="background:#25D366;">
                   <i class="fab fa-whatsapp"></i> Contatar
                 </a>
-                ` : ''}
-                ${client.trackingCode ? `
+                `
+                    : ""
+                }
+                ${
+                  client.trackingCode
+                    ? `
                 <button class="btn btn-sm consultar-btn" onclick="consultarRastreio(${i}, this)">
                   <i class="fas fa-search"></i> Consultar
                 </button>
-                ` : ''}
+                `
+                    : ""
+                }
               </div>
-              ${!client.delivered ? `
+              ${
+                !client.delivered
+                  ? `
               <button class="btn btn-sm" onclick="markAsDelivered(${i})">
                 <i class="fas fa-check"></i> Entregue
               </button>
-              ` : ''}
+              `
+                  : ""
+              }
             </div>
           </div>`;
           grid.appendChild(card);
@@ -450,69 +525,87 @@
         const totalRevenue = clients.reduce((sum, c) => sum + c.value, 0);
         const totalCommission = totalRevenue * 0.55;
         const deliveredCount = clients.filter((c) => c.delivered).length;
-        const transitCount = clients.filter((c) => !c.delivered && c.trackingCode).length;
-        
-        document.getElementById("totalRevenue").textContent = formatCurrency(totalRevenue);
-        document.getElementById("totalCommission").textContent = formatCurrency(totalCommission);
+        const transitCount = clients.filter(
+          (c) => !c.delivered && c.trackingCode
+        ).length;
+
+        document.getElementById("totalRevenue").textContent =
+          formatCurrency(totalRevenue);
+        document.getElementById("totalCommission").textContent =
+          formatCurrency(totalCommission);
         document.getElementById("deliveredCount").textContent = deliveredCount;
         document.getElementById("totalCount").textContent = clients.length;
         document.getElementById("transitCount").textContent = transitCount;
       }
 
       function markAsDelivered(index) {
-        if (confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)) {
+        if (
+          confirm(`Marcar o pedido de ${clientData[index].name} como entregue?`)
+        ) {
           clientData[index].delivered = true;
           clientData[index].status = "Entregue";
-          
+
           // Atualizar o card específico
           const card = document.getElementById(`client-card-${index}`);
           if (card) {
-            const statusBadge = card.querySelector('.status-badge');
+            const statusBadge = card.querySelector(".status-badge");
             if (statusBadge) {
-              statusBadge.className = 'status-badge status-entregue';
-              statusBadge.textContent = 'Entregue';
+              statusBadge.className = "status-badge status-entregue";
+              statusBadge.textContent = "Entregue";
             }
-            
+
             // Remover botão de entregue
-            const deliveredButton = card.querySelector('.btn.btn-sm:last-child');
+            const deliveredButton = card.querySelector(
+              ".btn.btn-sm:last-child"
+            );
             if (deliveredButton) {
               deliveredButton.remove();
             }
           }
-          
+
           updateStats(clientData);
-          alert(`Pedido de ${clientData[index].name} marcado como entregue localmente!`);
+          alert(
+            `Pedido de ${clientData[index].name} marcado como entregue localmente!`
+          );
         }
       }
 
       function filterCards() {
-        const nameFilter = document.getElementById("searchName").value.toLowerCase();
+        const nameFilter = document
+          .getElementById("searchName")
+          .value.toLowerCase();
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
         const statusFilter = document.getElementById("statusFilter").value;
 
         const filtered = clientData.filter((c) => {
-          if (nameFilter && !c.name.toLowerCase().includes(nameFilter)) return false;
-          
+          if (nameFilter && !c.name.toLowerCase().includes(nameFilter))
+            return false;
+
           if (startDate && c.date) {
-            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            const clientDate = new Date(c.date).toISOString().split("T")[0];
             if (clientDate < startDate) return false;
           }
-          
+
           if (endDate && c.date) {
-            const clientDate = new Date(c.date).toISOString().split('T')[0];
+            const clientDate = new Date(c.date).toISOString().split("T")[0];
             if (clientDate > endDate) return false;
           }
-          
+
           if (statusFilter !== "all") {
             if (statusFilter === "Entregue" && !c.delivered) return false;
-            if (statusFilter === "Em trânsito" && (c.delivered || !c.trackingCode)) return false;
-            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode)) return false;
+            if (
+              statusFilter === "Em trânsito" &&
+              (c.delivered || !c.trackingCode)
+            )
+              return false;
+            if (statusFilter === "Agendado" && (c.delivered || c.trackingCode))
+              return false;
           }
-          
+
           return true;
         });
-        
+
         renderClientCards(filtered);
       }
 
@@ -522,16 +615,24 @@
         const today = new Date();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
-        
-        document.getElementById("startDate").value = thirtyDaysAgo.toISOString().split("T")[0];
-        document.getElementById("endDate").value = today.toISOString().split("T")[0];
-        
+
+        document.getElementById("startDate").value = thirtyDaysAgo
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("endDate").value = today
+          .toISOString()
+          .split("T")[0];
+
         // Carregar dados iniciais
         loadClientData();
-        
+
         // Configurar event listeners
-        document.getElementById("filterBtn").addEventListener("click", filterCards);
-        document.getElementById("refreshBtn").addEventListener("click", loadClientData);
+        document
+          .getElementById("filterBtn")
+          .addEventListener("click", filterCards);
+        document
+          .getElementById("refreshBtn")
+          .addEventListener("click", loadClientData);
         document.getElementById("searchName").addEventListener("keyup", (e) => {
           if (e.key === "Enter") filterCards();
         });
