@@ -96,6 +96,7 @@
       .filter-group {
         flex: 1;
         min-width: 200px;
+        max-width: 300px;
       }
       .filter-group label {
         display: block;
@@ -238,6 +239,7 @@
         }
         .filter-group {
           width: 100%;
+          max-width: none;
         }
         .client-grid {
           grid-template-columns: 1fr;
@@ -333,24 +335,20 @@
 
       <div class="filters">
         <div class="filter-group">
-          <label for="searchName">Buscar por nome</label
-          ><input
-            type="text"
-            id="searchName"
-            placeholder="Digite o nome do cliente"
-          />
+          <label for="searchName">Buscar por nome</label>
+          <input type="text" id="searchName" placeholder="Digite o nome do cliente" />
         </div>
         <div class="filter-group">
-          <label for="startDate">Data inicial</label
-          ><input type="date" id="startDate" />
+          <label for="startDate">Data inicial</label>
+          <input type="date" id="startDate" />
         </div>
         <div class="filter-group">
-          <label for="endDate">Data final</label
-          ><input type="date" id="endDate" />
+          <label for="endDate">Data final</label>
+          <input type="date" id="endDate" />
         </div>
         <div class="filter-group">
-          <label for="statusFilter">Status</label
-          ><select id="statusFilter">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter">
             <option value="all">Todos</option>
             <option value="Agendado">Agendado</option>
             <option value="Entregue">Entregue</option>
@@ -358,8 +356,8 @@
           </select>
         </div>
         <div class="filter-group">
-          <label style="opacity: 0">Filtrar</label
-          ><button class="btn" id="filterBtn">
+          <label style="opacity: 0">Filtrar</label>
+          <button class="btn" id="filterBtn">
             <i class="fas fa-filter"></i> Filtrar
           </button>
         </div>
@@ -382,18 +380,8 @@
       // ====== CONFIG ======
       const SHEET_URL = "https://script.google.com/macros/s/AKfycbx07hefOXrjctLZj2YeqwCsXfjd6A7ph5AniqIO8WLQjeA9tpAZ4k5GGKjf34CJ5v8LQA/exec?action=getData";
       const TRACK_URL = "https://script.google.com/macros/s/AKfycbx07hefOXrjctLZj2YeqwCsXfjd6A7ph5AniqIO8WLQjeA9tpAZ4k5GGKjf34CJ5v8LQA/exec?action=trackCode";
-      
-      // Servidores CORS Anywhere (várias opções)
-      const CORS_PROXIES = [
-        "https://cors-anywhere.herokuapp.com/",
-        "https://api.codetabs.com/v1/proxy?quest=",
-        "https://corsproxy.io/?",
-        "https://proxy.cors.sh/",
-        "https://crossorigin.me/"
-      ];
 
       let clientData = [];
-      let currentCorsProxy = CORS_PROXIES[0];
       // Cache para armazenar consultas já realizadas
       const trackingCache = new Map();
 
@@ -401,44 +389,20 @@
         try {
           document.getElementById('clientGrid').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando dados...</div>';
           
-          // Tentar carregar dados com CORS proxy
-          const data = await fetchWithCorsProxy(SHEET_URL);
+          // Fazer requisição diretamente para a API do Google Apps Script
+          const response = await fetch(SHEET_URL);
+          
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
           processClientData(data);
           
         } catch (error) {
           console.error("Erro ao carregar dados:", error);
           document.getElementById('clientGrid').innerHTML = `<div class="error-message"><i class='fas fa-exclamation-triangle'></i> Erro ao carregar dados: ${error.message}</div>`;
         }
-      }
-
-      // Função para fazer fetch com CORS proxy
-      async function fetchWithCorsProxy(url, options = {}) {
-        let lastError = null;
-        
-        // Tentar cada proxy até um funcionar
-        for (const proxy of CORS_PROXIES) {
-          try {
-            const proxyUrl = proxy + encodeURIComponent(url);
-            console.log("Tentando proxy:", proxy);
-            
-            const response = await fetch(proxyUrl, options);
-            
-            if (!response.ok) {
-              throw new Error(`Erro HTTP: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            currentCorsProxy = proxy; // Usar este proxy daqui para frente
-            return data;
-            
-          } catch (error) {
-            console.warn(`Proxy ${proxy} falhou:`, error);
-            lastError = error;
-            continue; // Tentar próximo proxy
-          }
-        }
-        
-        throw new Error(`Todos os proxies CORS falharam: ${lastError?.message}`);
       }
 
       function processClientData(data) {
@@ -508,8 +472,8 @@
         }
         
         try {
-          // Usar nossa própria API para rastreamento
-          const response = await fetchWithCorsProxy(TRACK_URL, {
+          // Fazer requisição diretamente para a API do Google Apps Script
+          const response = await fetch(TRACK_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -517,9 +481,15 @@
             body: JSON.stringify({ code: trackingCode })
           });
           
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
           // Processar a resposta da nossa API
-          if (response && response.trackingData) {
-            const trackingData = response.trackingData;
+          if (data && data.trackingData) {
+            const trackingData = data.trackingData;
             
             // Extrair informações relevantes
             const events = trackingData.eventos || [];
